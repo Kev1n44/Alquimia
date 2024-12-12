@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego del Hechicero</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #000;
+            color: #fff;
+        }
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background-color: #111;
+            border: 2px solid #fff;
+            overflow: hidden;
+        }
+        .popup {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #222;
+            color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 0 10px #fff;
+        }
+        .character, .enemy, .key, .projectile {
+            position: absolute;
+        }
+        .character {
+            width: 40px;
+            height: 40px;
+            background: url('Hechicero.png') no-repeat center;
+            background-size: cover;
+        }
+        .enemy {
+            font-size: 30px;
+        }
+        .key {
+            font-size: 30px;
+        }
+        .projectile {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: blue;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div class="popup" id="welcome-popup">
+            <p>¡Bienvenid@ al reino alquímico de Almus!</p>
+            <p>A continuación deberás sortear y acabar con las adversidades para alcanzar la llave que te llevará al centro de alquimia donde podrás construir un elemento espacial para obsequiar. Deberás mover al hechicero con las flechas de tu teclado y podrás disparar tus hechizos con la tecla "espacio". ¡Alcanza la llave para ganar!</p>
+            <button id="start-button">Aceptar</button>
+        </div>
+    </div>
+
+    <script>
+    const container = document.getElementById('game-container');
+    const popup = document.getElementById('welcome-popup');
+    const startButton = document.getElementById('start-button');
+
+    let character, key, enemies = [], projectiles = [];
+    let gameInterval, keyInterval;
+    let keyVisible = false;
+    let lastDirection = { dx: 0, dy: -5 }; // Dirección inicial de los proyectiles
+
+    const characterSize = 40;
+    const enemySize = 30;
+    const projectileSize = 10;
+
+    function createCharacter() {
+        character = document.createElement('div');
+        character.className = 'character';
+        character.style.left = '0px';
+        character.style.top = '0px';
+        container.appendChild(character);
+    }
+
+    function createEnemies() {
+        const enemyEmojis = ['👹', '👻', '🦇'];
+        for (let i = 0; i < 20; i++) {
+            const enemy = document.createElement('div');
+            enemy.className = 'enemy';
+            enemy.textContent = enemyEmojis[Math.floor(Math.random() * enemyEmojis.length)];
+            enemy.style.left = Math.random() * (container.offsetWidth - enemySize) + 'px';
+            enemy.style.top = Math.random() * (container.offsetHeight - enemySize) + 'px';
+            enemy.dataset.dx = Math.random() > 0.5 ? 1 : -1;
+            enemy.dataset.dy = Math.random() > 0.5 ? 1 : -1;
+            enemies.push(enemy);
+            container.appendChild(enemy);
+        }
+    }
+
+    function createKey() {
+        key = document.createElement('div');
+        key.className = 'key';
+        key.textContent = '🗝️';
+        container.appendChild(key);
+        positionKey();
+    }
+
+    function positionKey() {
+    let isFarEnough = false;
+    const minDistance = 400; // Distancia mínima en píxeles
+
+    while (!isFarEnough) {
+        // Generar una posición aleatoria para la llave
+        const keyX = Math.random() * (container.offsetWidth - enemySize);
+        const keyY = Math.random() * (container.offsetHeight - enemySize);
+
+        const characterX = parseFloat(character.style.left);
+        const characterY = parseFloat(character.style.top);
+
+        // Calcular la distancia entre el hechicero y la llave
+        const distance = Math.sqrt(
+            Math.pow(characterX - keyX, 2) + Math.pow(characterY - keyY, 2)
+        );
+
+        if (distance >= minDistance) {
+            key.style.left = keyX + 'px';
+            key.style.top = keyY + 'px';
+            isFarEnough = true; // La posición es válida
+        }
+    }
+
+    key.style.display = 'block'; // Asegurarse de que sea visible
+    keyVisible = true;
+
+    setTimeout(() => {
+        key.style.display = 'none';
+        keyVisible = false;
+    }, 7000);
+}
+
+    function moveEnemies() {
+        enemies.forEach((enemy, index) => {
+            let x = parseFloat(enemy.style.left);
+            let y = parseFloat(enemy.style.top);
+            let dx = parseFloat(enemy.dataset.dx);
+            let dy = parseFloat(enemy.dataset.dy);
+
+            if (x + dx < 0 || x + dx > container.offsetWidth - enemySize) dx *= -1;
+            if (y + dy < 0 || y + dy > container.offsetHeight - enemySize) dy *= -1;
+
+            enemy.style.left = x + dx + 'px';
+            enemy.style.top = y + dy + 'px';
+
+            enemy.dataset.dx = dx;
+            enemy.dataset.dy = dy;
+        });
+    }
+
+    function moveCharacter(dx, dy) {
+        const x = parseFloat(character.style.left) + dx;
+        const y = parseFloat(character.style.top) + dy;
+        character.style.left = Math.max(0, Math.min(container.offsetWidth - characterSize, x)) + 'px';
+        character.style.top = Math.max(0, Math.min(container.offsetHeight - characterSize, y)) + 'px';
+        lastDirection = { dx, dy }; // Actualizar dirección del movimiento
+    }
+
+    function fireProjectile() {
+    const projectile = document.createElement('div');
+    projectile.className = 'projectile';
+    projectile.style.backgroundColor = 'blue'; // Diferenciarlo visualmente
+    projectile.style.left = parseFloat(character.style.left) + characterSize / 2 - projectileSize / 2 + 'px';
+    projectile.style.top = parseFloat(character.style.top) + characterSize / 2 - projectileSize / 2 + 'px';
+    projectile.dataset.dx = lastDirection.dx;
+    projectile.dataset.dy = lastDirection.dy;
+    projectile.dataset.owner = 'player'; // Marca que el proyectil pertenece al jugador
+    projectiles.push(projectile);
+    container.appendChild(projectile);
+}
+
+
+
+
+function createEnemyWithShooter() {
+    const enemy = document.createElement('div');
+    enemy.className = 'enemy';
+    enemy.textContent = '👁️';
+    enemy.style.left = Math.random() * (container.offsetWidth - enemySize) + 'px';
+    enemy.style.top = Math.random() * (container.offsetHeight - enemySize) + 'px';
+    enemy.dataset.dx = Math.random() > 0.5 ? 1 : -1;
+    enemy.dataset.dy = Math.random() > 0.5 ? 1 : -1;
+    enemy.dataset.special = true; // Marca que este enemigo es especial
+    enemies.push(enemy);
+    container.appendChild(enemy);
+
+    // Iniciar disparos periódicos
+    setInterval(() => {
+        fireEnemyProjectile(enemy);
+    }, 2000);
+}
+
+
+function fireEnemyProjectile(enemy) {
+    const projectile = document.createElement('div');
+    projectile.className = 'projectile';
+    projectile.style.backgroundColor = 'red';
+    projectile.style.left = parseFloat(enemy.style.left) + enemySize / 2 - projectileSize / 2 + 'px';
+    projectile.style.top = parseFloat(enemy.style.top) + enemySize / 2 - projectileSize / 2 + 'px';
+    projectile.dataset.dx = 0; // Cambia según el movimiento deseado
+    projectile.dataset.dy = 5; // Por ejemplo, mueve hacia abajo
+    projectile.dataset.owner = 'enemy'; // Marca que el proyectil pertenece al enemigo
+    projectiles.push(projectile);
+    container.appendChild(projectile);
+}
+
+
+
+
+function createEnemyInCorner() {
+    const enemyEmojis = ['👹', '👻', '🦇'];
+    const cornerPositions = [
+        { left: '0px', top: '0px' }, // Esquina superior izquierda
+        { left: container.offsetWidth - enemySize + 'px', top: '0px' }, // Esquina superior derecha
+        { left: '0px', top: container.offsetHeight - enemySize + 'px' }, // Esquina inferior izquierda
+        { left: container.offsetWidth - enemySize + 'px', top: container.offsetHeight - enemySize + 'px' } // Esquina inferior derecha
+    ];
+    const randomCorner = cornerPositions[Math.floor(Math.random() * cornerPositions.length)];
+
+    const newEnemy = document.createElement('div');
+    newEnemy.className = 'enemy';
+    newEnemy.textContent = enemyEmojis[Math.floor(Math.random() * enemyEmojis.length)];
+    newEnemy.style.left = randomCorner.left;
+    newEnemy.style.top = randomCorner.top;
+    newEnemy.dataset.dx = Math.random() > 0.5 ? 1 : -1;
+    newEnemy.dataset.dy = Math.random() > 0.5 ? 1 : -1;
+    enemies.push(newEnemy);
+    container.appendChild(newEnemy);
+}
+
+
+
+    function moveProjectiles() {
+    projectiles.forEach((projectile, index) => {
+        let x = parseFloat(projectile.style.left) + parseFloat(projectile.dataset.dx);
+        let y = parseFloat(projectile.style.top) + parseFloat(projectile.dataset.dy);
+
+        projectile.style.left = x + 'px';
+        projectile.style.top = y + 'px';
+
+        if (x < 0 || x > container.offsetWidth || y < 0 || y > container.offsetHeight) {
+            projectile.remove();
+            projectiles.splice(index, 1);
+            return;
+        }
+
+        const projectileRect = projectile.getBoundingClientRect();
+        const charRect = character.getBoundingClientRect();
+
+        if (projectile.dataset.owner === 'enemy') {
+            // Verificar colisión con el hechicero
+            if (
+                projectileRect.left < charRect.right &&
+                projectileRect.right > charRect.left &&
+                projectileRect.top < charRect.bottom &&
+                projectileRect.bottom > charRect.top
+            ) {
+                endGame(false);
+            }
+        } else if (projectile.dataset.owner === 'player') {
+            // Verificar colisión con enemigos
+            enemies.forEach((enemy, enemyIndex) => {
+                const enemyRect = enemy.getBoundingClientRect();
+                if (
+                    projectileRect.left < enemyRect.right &&
+                    projectileRect.right > enemyRect.left &&
+                    projectileRect.top < enemyRect.bottom &&
+                    projectileRect.bottom > enemyRect.top
+                ) {
+                    // Ignorar los enemigos que son especiales (el ojo)
+                    if (enemy.dataset.special) {
+                        return; // No hacer nada con el enemigo especial
+                    }
+
+                    enemy.remove();
+                    projectile.remove();
+                    enemies.splice(enemyIndex, 1);
+                    projectiles.splice(index, 1);
+
+                    // Crear un nuevo enemigo en una esquina
+                    createEnemyInCorner();
+                }
+            });
+        }
+    });
+}
+
+    function checkCollisions() {
+        enemies.forEach(enemy => {
+            const enemyRect = enemy.getBoundingClientRect();
+            const charRect = character.getBoundingClientRect();
+
+            if (
+                charRect.left < enemyRect.right &&
+                charRect.right > enemyRect.left &&
+                charRect.top < enemyRect.bottom &&
+                charRect.bottom > enemyRect.top
+            ) {
+                endGame(false);
+            }
+        });
+
+        if (keyVisible) {
+            const keyRect = key.getBoundingClientRect();
+            const charRect = character.getBoundingClientRect();
+
+            if (
+                charRect.left < keyRect.right &&
+                charRect.right > keyRect.left &&
+                charRect.top < keyRect.bottom &&
+                charRect.bottom > keyRect.top
+            ) {
+                endGame(true);
+            }
+        }
+    }
+
+    function endGame(win) {
+        clearInterval(gameInterval);
+        clearInterval(keyInterval);
+        alert(win ? '¡Has ganado!' : 'Has perdido.');
+        location.reload();
+    }
+
+    startButton.addEventListener('click', () => {
+    popup.style.display = 'none';
+    createCharacter();
+    createEnemies();
+    createEnemyWithShooter(); // Agregar el nuevo enemigo
+    createKey();
+    gameInterval = setInterval(() => {
+        moveEnemies();
+        moveProjectiles();
+        checkCollisions();
+    }, 30);
+
+    keyInterval = setInterval(() => {
+        if (!keyVisible) {
+            key.style.display = 'block';
+            positionKey();
+        }
+    }, 12000);
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'ArrowUp') moveCharacter(0, -10);
+        if (e.key === 'ArrowDown') moveCharacter(0, 10);
+        if (e.key === 'ArrowLeft') moveCharacter(-10, 0);
+        if (e.key === 'ArrowRight') moveCharacter(10, 0);
+        if (e.key === ' ') fireProjectile();
+    });
+});
+</script>
